@@ -35,7 +35,9 @@
 #define MMIO_READWRITE 0x00000002 /* open file for reading and writing */
 
 /* MMIO macros */
+#ifndef mmioFOURCC
 #define mmioFOURCC(ch0, ch1, ch2, ch3) FOURCC(ch0, ch1, ch2, ch3)
+#endif
 
 /* standard four character codes */
 #define FOURCC_RIFF mmioFOURCC('R', 'I', 'F', 'F')
