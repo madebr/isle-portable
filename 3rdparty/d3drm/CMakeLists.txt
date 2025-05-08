@@ -47,6 +47,7 @@ add_library(d3drm-wine SHARED
     viewport.c
     d3drm.def
 )
+target_sources(d3drm-wine PRIVATE "${def}")
 if(WINE_D3DRM_DYNAMIC_D3DXOF)
     target_sources(d3drm-wine PRIVATE dyn_d3dxof.c dyn_d3dxof.h)
     target_compile_definitions(d3drm-wine PRIVATE DYNAMIC_D3DXOF)

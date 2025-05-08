@@ -5,7 +5,7 @@
 
 #include <d3drm.h>
 
-#ifndef D3DRM_WINE
+#ifdef LPD3DRM_APPDATA_IS_DWORD
 typedef DWORD LPD3DRM_APPDATA;
 #else
 typedef LPVOID LPD3DRM_APPDATA;

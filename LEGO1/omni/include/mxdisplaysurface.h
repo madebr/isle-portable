@@ -17,6 +17,7 @@ public:
 	MxDisplaySurface();
 	~MxDisplaySurface() override;
 
+#if 1
 	virtual MxResult Init(
 		MxVideoParam& p_videoParam,
 		LPDIRECTDRAWSURFACE p_ddSurface1,
@@ -26,6 +27,7 @@ public:
 	virtual MxResult Create(MxVideoParam& p_videoParam); // vtable+0x18
 	virtual void Destroy();                              // vtable+0x1c
 	virtual void SetPalette(MxPalette* p_palette);       // vtable+0x20
+
 	virtual void VTable0x24(
 		LPDDSURFACEDESC p_desc,
 		MxBitmap* p_bitmap,
@@ -124,6 +126,7 @@ private:
 	MxBool m_initialized;             // 0x38
 	DDSURFACEDESC m_surfaceDesc;      // 0x3c
 	MxU16* m_16bitPal;                // 0xa8
+#endif
 };
 
 // SYNTHETIC: LEGO1 0x100ba580

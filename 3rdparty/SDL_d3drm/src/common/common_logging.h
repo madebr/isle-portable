@@ -1,0 +1,8 @@
+#ifndef COMMON_LOGGING_H
+#define COMMON_LOGGING_H
+
+enum {
+    D3DRM_CATEGORY = SDL_LOG_CATEGORY_CUSTOM,
+};
+
+#endif // COMMON_LOGGING_H

@@ -292,6 +292,7 @@ MxBool MxPalette::operator==(MxPalette& p_other)
 // FUNCTION: BETA10 0x1014445a
 void MxPalette::ApplySystemEntriesToPalette(LPPALETTEENTRY p_entries)
 {
+#ifdef _WIN32
 	HDC hdc;
 
 	hdc = GetDC(0);
@@ -304,12 +305,14 @@ void MxPalette::ApplySystemEntriesToPalette(LPPALETTEENTRY p_entries)
 		memcpy(&p_entries[246], &g_defaultPaletteEntries[246], sizeof(PALETTEENTRY) * 10);
 	}
 	ReleaseDC(0, hdc);
+#endif
 }
 
 // FUNCTION: LEGO1 0x100bf420
 // FUNCTION: BETA10 0x10144517
 void MxPalette::GetDefaultPalette(LPPALETTEENTRY p_entries)
 {
+#ifdef _WIN32
 	HDC hdc;
 
 	hdc = GetDC(0);
@@ -322,6 +325,7 @@ void MxPalette::GetDefaultPalette(LPPALETTEENTRY p_entries)
 	}
 
 	ReleaseDC(0, hdc);
+#endif
 }
 
 // FUNCTION: LEGO1 0x100bf490

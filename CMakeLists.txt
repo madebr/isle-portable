@@ -11,6 +11,7 @@ project(isle CXX C)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}" CACHE PATH "Directory where to put executables and dll")
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 # By configuring CMake with -DDOWNLOAD_DEPENDENCIES=ON/OFF,
 # users can choose between downloading dependencies or using system libraries
@@ -83,6 +84,12 @@ function(add_cxx_warning WARNING)
     endif()
 endfunction()
 
+function(target_no_undefined_symbols TARGET)
+  if(CMAKE_C_COMPILER_ID MATCHES "AppleClang|Clang|GNU")
+    target_link_options(${TARGET} PRIVATE "-Wl,--no-undefined")
+  endif()
+endfunction()
+
 if(NOT MINGW)
     set(NOT_MINGW TRUE)
 else()
@@ -94,8 +101,9 @@ add_subdirectory(3rdparty EXCLUDE_FROM_ALL SYSTEM)
 option(ISLE_WERROR "Treat warnings as errors" OFF)
 option(ISLE_BUILD_APP "Build ISLE.EXE application" ON)
 cmake_dependent_option(ISLE_BUILD_CONFIG "Build CONFIG.EXE application" ON "NOT MINGW" OFF)
-option(ISLE_USE_DX5 "Build with internal DirectX 5 SDK" ${NOT_MINGW})
-cmake_dependent_option(ISLE_D3DRM_FROM_WINE "Use d3drm from wine" "${MINGW}" "NOT ISLE_USE_DX5" OFF)
+cmake_dependent_option(ISLE_USE_DIRECTX "Use DirectX" ON WIN32 OFF)
+cmake_dependent_option(ISLE_USE_DX5 "Build with internal DirectX 5 SDK" ${NOT_MINGW} ISLE_USE_DIRECTX OFF)
+cmake_dependent_option(ISLE_D3DRM_FROM_WINE "Use d3drm from wine" "${MINGW}" "ISLE_USE_DIRECTX;NOT ISLE_USE_DX5" OFF)
 
 message(STATUS "Using internal DirectX5 SDK: ${ISLE_USE_DX5}")
 message(STATUS "Using d3drm from wine:       ${ISLE_D3DRM_FROM_WINE}")
@@ -111,6 +119,24 @@ add_subdirectory(3rdparty/d3drm EXCLUDE_FROM_ALL)
 add_library(Vec::Vec INTERFACE IMPORTED)
 target_include_directories(Vec::Vec INTERFACE "${CMAKE_SOURCE_DIR}/3rdparty/vec")
 
+add_library(d3drm-interface INTERFACE)
+if(ISLE_USE_DIRECTX)
+  if(ISLE_D3DRM_FROM_WINE)
+    target_link_libraries(d3drm-interface INTERFACE d3drm-wine)
+    target_compile_definitions(d3drm-interface INTERFACE "D3DRM_WINE")
+  else()
+    target_link_libraries(d3drm-interface INTERFACE d3drm)
+    target_compile_definitions(d3drm-interface INTERFACE "LPD3DRM_APPDATA_IS_DWORD")
+  endif()
+else()
+  add_subdirectory(3rdparty/SDL_d3drm EXCLUDE_FROM_ALL)
+  target_link_libraries(d3drm-interface INTERFACE SDL3_d3drm)
+  if(NOT WIN32)
+    add_compile_definitions(-DFAKE_WINDOWS)
+    include_directories(3rdparty/SDL_d3drm/include/fakewindows)
+  endif()
+endif()
+
 set(lego1_targets)
 set(lego1_interface_targets)
 macro(add_lego1_static_library NAME)
@@ -118,12 +144,12 @@ macro(add_lego1_static_library NAME)
   list(APPEND lego1_interface_targets ${NAME}-interface)
   add_library(${NAME}-interface INTERFACE)
   add_library(${NAME}-objects STATIC ${ARGN})
+#  target_include_directories(${NAME}-objects PRIVATE $<TARGET_PROPERTY:${NAME}-interface,INTERFACE_INCLUDE_DIRECTORIES>)
   target_link_libraries(${NAME}-objects PRIVATE ${NAME}-interface)
 
   target_include_directories(${NAME}-objects PRIVATE $<$<BOOL:${ISLE_D3DRM_FROM_WINE}>:$<TARGET_PROPERTY:d3drm-wine,INTERFACE_INCLUDE_DIRECTORIES>>)
   target_link_libraries(${NAME}-interface INTERFACE $<$<BOOL:${ISLE_USE_DX5}>:DirectX5::DirectX5> SDL3::SDL3)
   target_compile_definitions(${NAME}-objects PRIVATE $<$<BOOL:${ISLE_USE_DX5}>:DIRECTX5_SDK>)
-  target_compile_definitions(${NAME}-objects PRIVATE $<$<BOOL:${ISLE_D3DRM_FROM_WINE}>:D3DRM_WINE>)
 endmacro()
 
 add_lego1_static_library(tglrl
@@ -138,11 +164,7 @@ add_lego1_static_library(tglrl
   LEGO1/tgl/d3drm/view.cpp
 )
 target_include_directories(tglrl-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
-if(ISLE_D3DRM_FROM_WINE)
-    target_link_libraries(tglrl-interface INTERFACE d3drm-wine)
-else()
-    target_link_libraries(tglrl-interface INTERFACE d3drm)
-endif()
+target_link_libraries(tglrl-interface INTERFACE d3drm-interface)
 
 add_lego1_static_library(realtime
   LEGO1/realtime/orientableroi.cpp
@@ -159,16 +181,18 @@ add_lego1_static_library(viewmanager
   LEGO1/viewmanager/viewroi.cpp
 )
 target_include_directories(viewmanager-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
-target_link_libraries(viewmanager-interface INTERFACE Vec::Vec)
+target_link_libraries(viewmanager-interface INTERFACE Vec::Vec tglrl-interface)
 
-add_lego1_static_library(mxdirectx
-  LEGO1/mxdirectx/mxdirect3d.cpp
-  LEGO1/mxdirectx/mxdirectdraw.cpp
-  LEGO1/mxdirectx/mxdirectxinfo.cpp
-  LEGO1/mxdirectx/legodxinfo.cpp
-)
-target_include_directories(mxdirectx-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
-target_link_libraries(mxdirectx-interface INTERFACE ddraw)
+if(WIN32)
+  add_lego1_static_library(mxdirectx
+    LEGO1/mxdirectx/mxdirect3d.cpp
+    LEGO1/mxdirectx/mxdirectdraw.cpp
+    LEGO1/mxdirectx/mxdirectxinfo.cpp
+    LEGO1/mxdirectx/legodxinfo.cpp
+  )
+  target_include_directories(mxdirectx-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
+  target_link_libraries(mxdirectx-interface INTERFACE ddraw)
+endif()
 
 add_lego1_static_library(roi
   LEGO1/lego/sources/roi/legolod.cpp
@@ -211,7 +235,7 @@ add_lego1_static_library(misc
   LEGO1/lego/sources/misc/legounknown.cpp
 )
 target_include_directories(misc-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1/omni/include" "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/LEGO1/lego/sources" "${CMAKE_SOURCE_DIR}/util")
-target_link_libraries(misc-interface INTERFACE)
+target_link_libraries(misc-interface INTERFACE tglrl-interface)
 
 add_lego1_static_library(3dmanager
   LEGO1/lego/sources/3dmanager/lego3dmanager.cpp
@@ -220,7 +244,7 @@ add_lego1_static_library(3dmanager
   LEGO1/lego/sources/3dmanager/tglsurface.cpp
 )
 target_include_directories(3dmanager-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
-target_link_libraries(3dmanager-interface INTERFACE Vec::Vec)
+target_link_libraries(3dmanager-interface INTERFACE Vec::Vec tglrl-interface)
 
 add_lego1_static_library(omni
   LEGO1/omni/src/action/mxdsaction.cpp
@@ -285,7 +309,6 @@ add_lego1_static_library(omni
   LEGO1/omni/src/system/mxticklethread.cpp
   LEGO1/omni/src/video/flic.cpp
   LEGO1/omni/src/video/mxbitmap.cpp
-  LEGO1/omni/src/video/mxdisplaysurface.cpp
   LEGO1/omni/src/video/mxflcpresenter.cpp
   LEGO1/omni/src/video/mxloopingflcpresenter.cpp
   LEGO1/omni/src/video/mxloopingsmkpresenter.cpp
@@ -299,8 +322,16 @@ add_lego1_static_library(omni
   LEGO1/omni/src/video/mxvideoparamflags.cpp
   LEGO1/omni/src/video/mxvideopresenter.cpp
 )
+if(WIN32)
+  target_sources(omni-objects PRIVATE
+    LEGO1/omni/src/video/mxdisplaysurface.cpp
+  )
+endif()
 target_include_directories(omni-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1/omni/include" "${CMAKE_SOURCE_DIR}/LEGO1" "${CMAKE_SOURCE_DIR}/util")
-target_link_libraries(omni-interface INTERFACE winmm libsmacker miniaudio)
+if(WIN32)
+#  target_link_libraries(omni-interface INTERFACE winmm)
+endif()
+target_link_libraries(omni-interface INTERFACE d3drm-interface libsmacker miniaudio)
 
 add_lego1_static_library(lego1_impl
   LEGO1/define.cpp
@@ -397,7 +428,6 @@ add_lego1_static_library(lego1_impl
   LEGO1/lego/legoomni/src/video/legopartpresenter.cpp
   LEGO1/lego/legoomni/src/video/legophonemepresenter.cpp
   LEGO1/lego/legoomni/src/video/legotexturepresenter.cpp
-  LEGO1/lego/legoomni/src/video/legovideomanager.cpp
   LEGO1/lego/legoomni/src/worlds/act3.cpp
   LEGO1/lego/legoomni/src/worlds/elevatorbottom.cpp
   LEGO1/lego/legoomni/src/worlds/gasstation.cpp
@@ -413,7 +443,12 @@ add_lego1_static_library(lego1_impl
   LEGO1/lego/legoomni/src/worlds/score.cpp
   LEGO1/modeldb/modeldb.cpp
 )
-target_include_directories(lego1_impl-interface INTERFACE "${CMAKE_SOURCE_DIR}/util")
+if(WIN32)
+  target_sources(lego1_impl-objects PRIVATE
+    LEGO1/lego/legoomni/src/video/legovideomanager.cpp
+  )
+endif()
+  target_include_directories(lego1_impl-interface INTERFACE "${CMAKE_SOURCE_DIR}/util")
 target_include_directories(lego1_impl-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1")
 target_include_directories(lego1_impl-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1/omni/include")
 target_include_directories(lego1_impl-interface INTERFACE "${CMAKE_SOURCE_DIR}/LEGO1/lego/sources")
@@ -426,7 +461,7 @@ if(MINGW)
 endif()
 
 set(lego1_objects)
-set(lego1_link_libraries dxguid d3drm_guid)
+set(lego1_link_libraries d3drm_guid)
 foreach(lego1_library IN LISTS lego1_targets)
   target_compile_definitions(${lego1_library}-objects PRIVATE LEGO1_DLL)
   list(APPEND lego1_objects $<TARGET_OBJECTS:${lego1_library}-objects>)
@@ -437,11 +472,14 @@ add_library(lego1 SHARED
   ${lego1_objects}
 )
 target_link_libraries(lego1 PUBLIC ${lego1_link_libraries})
+target_no_undefined_symbols(lego1)
 
 # Make sure filenames are ALL CAPS
-set_property(TARGET lego1 PROPERTY OUTPUT_NAME LEGO1)
-set_property(TARGET lego1 PROPERTY PREFIX "")
-set_property(TARGET lego1 PROPERTY SUFFIX ".DLL")
+if(WIN32)
+  set_property(TARGET lego1 PROPERTY OUTPUT_NAME LEGO1)
+  set_property(TARGET lego1 PROPERTY PREFIX "")
+  set_property(TARGET lego1 PROPERTY SUFFIX ".DLL")
+endif()
 
 if (ISLE_BUILD_APP)
   add_executable(isle WIN32
@@ -462,13 +500,19 @@ if (ISLE_BUILD_APP)
   target_link_libraries(isle PRIVATE SDL3::SDL3 iniparser-static)
 
   # Link DSOUND, WINMM, and LEGO1
-  target_link_libraries(isle PRIVATE winmm lego1)
+  if(WIN32)
+    target_link_libraries(isle PRIVATE winmm lego1)
+  endif()
+  target_link_libraries(isle PRIVATE lego1)
+  target_no_undefined_symbols(isle)
 
-  target_include_directories(isle PRIVATE $<$<BOOL:${ISLE_D3DRM_FROM_WINE}>:$<TARGET_PROPERTY:d3drm-wine,INTERFACE_INCLUDE_DIRECTORIES>>)
+  target_include_directories(isle PRIVATE $<TARGET_PROPERTY:d3drm-interface,INTERFACE_INCLUDE_DIRECTORIES>)
 
   # Make sure filenames are ALL CAPS
-  set_property(TARGET isle PROPERTY OUTPUT_NAME ISLE)
-  set_property(TARGET isle PROPERTY SUFFIX ".EXE")
+  if(WIN32)
+    set_property(TARGET isle PROPERTY OUTPUT_NAME ISLE)
+    set_property(TARGET isle PROPERTY SUFFIX ".EXE")
+  endif()
 endif()
 
 if (ISLE_BUILD_CONFIG)

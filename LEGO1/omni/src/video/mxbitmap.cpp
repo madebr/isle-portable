@@ -464,7 +464,10 @@ MxResult MxBitmap::StretchBits(
 	if (IsBottomUp()) {
 		p_ySrc = GetBmiHeightAbs() - p_ySrc - p_destHeight;
 	}
-
+#ifdef FAKE_WINDOWS
+    SDL_TriggerBreakpoint();
+    return FAILURE;
+#else
 	return StretchDIBits(
 		p_hdc,
 		p_xDest,
@@ -480,6 +483,7 @@ MxResult MxBitmap::StretchBits(
 		m_isHighColor,
 		SRCCOPY
 	);
+#endif
 }
 
 // FUNCTION: LEGO1 0x100bd450

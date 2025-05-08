@@ -26,8 +26,8 @@ typedef double MxDouble;
 typedef long MxLong;
 typedef unsigned long MxULong;
 #else
-typedef int MxLong;
-typedef unsigned int MxULong;
+typedef long MxLong;
+typedef unsigned long MxULong;
 #endif
 
 typedef MxS32 MxTime;
