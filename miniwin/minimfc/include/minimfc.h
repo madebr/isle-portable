@@ -82,17 +82,19 @@ struct OSVERSIONINFOA {
 typedef struct IUnknown* LPUNKNOWN;
 
 struct CWnd {
+	virtual ~CWnd() = default;
+	virtual void EnableWindow(bool bEnable) {}
+	virtual void SetWindowText(const char* text) {}
+	virtual BOOL SetWindowPos(const CWnd* pWndInsertAfter, int x, int y, int cx, int cy, UINT nFlags) { return TRUE; }
+	static CWnd wndTop;
 	HWND m_hWnd;
-	void EnableWindow(bool bEnable) {}
-	void SetWindowText(const char* text) {}
 };
 
 struct CDataExchange {
 	bool m_bSaveAndValidate;
 };
 
-struct CDialog {
-	HWND m_hWnd;
+struct CDialog : public CWnd {
 	int m_nIDTemplate;
 	CWnd* m_pParentWnd;
 	CDialog() : m_nIDTemplate(0), m_pParentWnd(nullptr) {}
@@ -128,7 +130,7 @@ struct CMenu {
 	int GetMenuItemCount() const { return 0; }
 };
 
-struct CWinApp {
+struct CWinApp : public CWnd {
 	CWinApp();
 	virtual ~CWinApp() = default;
 	virtual BOOL InitInstance() = 0;
@@ -162,11 +164,6 @@ inline WINBOOL WINAPI SetForegroundWindow(HWND hWnd)
 }
 
 inline BOOL ShowWindow(HWND hWnd, int nCmdShow)
-{
-	return TRUE;
-}
-
-inline BOOL SetWindowPos(CWinApp** hWnd, int X, int Y, int cx, int cy, UINT uFlags)
 {
 	return TRUE;
 }
@@ -342,15 +339,10 @@ inline void ParseCommandLine(CCommandLineInfo& cmdInfo)
 
 struct AFX_MODULE_STATE {
 	CWinApp* m_pCurrentWinApp;
+	char* m_lpszCurrentAppName;
 };
-extern char* afxCurrentAppName;
-extern CWinApp* wndTop;
-extern AFX_MODULE_STATE g_CustomModuleState;
+extern AFX_MODULE_STATE* AfxGetModuleState();
 #define afxCurrentWinApp AfxGetModuleState()->m_pCurrentWinApp
-inline AFX_MODULE_STATE* AfxGetModuleState()
-{
-	g_CustomModuleState.m_pCurrentWinApp = wndTop;
-	return &g_CustomModuleState;
-}
+#define afxCurrentAppName AfxGetModuleState()->m_lpszCurrentAppName
 
 void AfxMessageBox(const char* message);

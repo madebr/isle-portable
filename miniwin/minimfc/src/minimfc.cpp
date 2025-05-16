@@ -7,20 +7,21 @@
 #include <stdlib.h>
 #include <vector>
 
-char* afxCurrentAppName;
 AFX_MODULE_STATE g_CustomModuleState;
 CWinApp* wndTop;
 
 SDL_Window* window;
 const char* title = "Configure LEGO Island";
 
+CWnd CWnd::wndTop;
+
 CWinApp::CWinApp()
 {
-	if (wndTop != NULL) {
+	if (g_CustomModuleState.m_pCurrentWinApp != NULL) {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "There can only be one CWinApp!");
 		abort();
 	}
-	wndTop = this;
+	g_CustomModuleState.m_pCurrentWinApp = this;
 
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK)) {
 		SDL_Log("SDL_Init: %s\n", SDL_GetError());
@@ -62,11 +63,12 @@ static char* get_base_filename(const char* path)
 int main(int argc, char* argv[])
 {
 	afxCurrentAppName = get_base_filename(argv[0]);
-	if (wndTop == NULL) {
+	g_CustomModuleState.m_lpszCurrentAppName = afxCurrentAppName;
+	if (g_CustomModuleState.m_pCurrentWinApp == NULL) {
 		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No CWinApp created");
 		abort();
 	}
-	wndTop->InitInstance();
+	g_CustomModuleState.m_pCurrentWinApp->InitInstance();
 
 	SDL_Event event;
 	bool running = true;
@@ -80,7 +82,7 @@ int main(int argc, char* argv[])
 		SDL_Delay(16); // 60 FPS
 	}
 
-	int result = wndTop->ExitInstance();
+	int result = g_CustomModuleState.m_pCurrentWinApp->ExitInstance();
 	free(afxCurrentAppName);
 	return result;
 }
@@ -138,4 +140,10 @@ void GlobalMemoryStatus(MEMORYSTATUS* memory_status)
 {
 	memory_status->dwLength = sizeof(*memory_status);
 	memory_status->dwTotalPhys = 1024 * SDL_GetSystemRAM();
+}
+
+extern AFX_MODULE_STATE g_CustomModuleState;
+AFX_MODULE_STATE* AfxGetModuleState()
+{
+	return &g_CustomModuleState;
 }
