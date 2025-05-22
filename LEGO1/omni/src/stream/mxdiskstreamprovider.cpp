@@ -1,5 +1,7 @@
 #include "mxdiskstreamprovider.h"
 
+#include "legomain.h"
+#include "misc.h"
 #include "mxautolock.h"
 #include "mxdiskstreamcontroller.h"
 #include "mxdsbuffer.h"
@@ -10,6 +12,8 @@
 #include "mxstreamcontroller.h"
 #include "mxstring.h"
 #include "mxthread.h"
+
+#include <SDL3/SDL_messagebox.h>
 
 DECOMP_SIZE_ASSERT(MxDiskStreamProviderThread, 0x1c)
 DECOMP_SIZE_ASSERT(MxDiskStreamProvider, 0x60);
@@ -92,11 +96,22 @@ MxResult MxDiskStreamProvider::SetResourceToGet(MxStreamController* p_resource)
 
 	m_pFile = new MxDSFile(path.GetData(), 0);
 	if (m_pFile != NULL) {
-		if (m_pFile->Open(MxDSFile::e_openRead) != 0) {
+		if (m_pFile->Open(MxDSFile::e_openRead) != SUCCESS) {
 			path = MxString(MxOmni::GetCD()) + p_resource->GetAtom().GetInternal() + ".si";
 			m_pFile->SetFileName(path.GetData());
 
 			if (m_pFile->Open(MxDSFile::e_openRead) != 0) {
+				char buffer[256];
+				SDL_snprintf(
+					buffer,
+					sizeof(buffer),
+					"\"LEGO® Island\" failed to load %s%s.\nPlease make sure this file is available on HD/CD.",
+					p_resource->GetAtom().GetInternal(),
+					".si"
+				);
+				Lego()->Pause();
+				SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "LEGO® Island Error", buffer, NULL);
+				Lego()->Resume();
 				goto done;
 			}
 		}

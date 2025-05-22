@@ -290,6 +290,12 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 		return SDL_APP_SUCCESS;
 	}
 
+	if (const LegoOmni::FatalError fatal_error = Lego()->GetFatalError(); fatal_error != LegoOmni::FatalError::e_none) {
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "LEGO® Island Fatal Error", "A fatal error happened.", NULL);
+		Lego()->Destroy();
+		return SDL_APP_FAILURE;
+	}
+
 	if (!g_isle->Tick()) {
 		SDL_ShowSimpleMessageBox(
 			SDL_MESSAGEBOX_ERROR,

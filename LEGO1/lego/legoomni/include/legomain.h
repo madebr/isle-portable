@@ -43,6 +43,11 @@ public:
 		c_clearScreen = 0x04
 	};
 
+	enum FatalError {
+		e_none = 0,
+		e_loadWorld = 1
+	};
+
 	enum World {
 		e_undefined = -1,
 		e_act1 = 0,
@@ -203,6 +208,9 @@ public:
 		SDL_PushEvent(&event);
 	}
 
+	void SetFatalError(FatalError fatalError) { m_fatalError = fatalError; }
+	FatalError GetFatalError() const { return m_fatalError; }
+
 	// SYNTHETIC: LEGO1 0x10058b30
 	// LegoOmni::`scalar deleting destructor'
 
@@ -224,6 +232,7 @@ private:
 	MxDSAction m_action;                         // 0xa0
 	MxBackgroundAudioManager* m_bkgAudioManager; // 0x134
 	MxTransitionManager* m_transitionManager;    // 0x138
+	FatalError m_fatalError;
 
 public:
 	MxBool m_unk0x13c; // 0x13c

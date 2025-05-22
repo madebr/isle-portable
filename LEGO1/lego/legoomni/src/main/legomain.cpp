@@ -33,6 +33,7 @@
 #include "viewmanager/viewmanager.h"
 
 #include <SDL3/SDL_log.h>
+#include <SDL3/SDL_messagebox.h>
 #include <SDL3/SDL_stdinc.h>
 
 DECOMP_SIZE_ASSERT(LegoOmni, 0x140)
@@ -76,6 +77,7 @@ void LegoOmni::Init()
 	m_bkgAudioManager = NULL;
 	m_unk0x13c = TRUE;
 	m_transitionManager = NULL;
+	m_fatalError = FatalError::e_none;
 }
 
 // FUNCTION: LEGO1 0x10058c30

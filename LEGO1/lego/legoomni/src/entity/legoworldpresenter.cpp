@@ -445,7 +445,9 @@ void LegoWorldPresenter::ParseExtra()
 		char output[1024];
 		if (KeyValueStringParse(output, g_strWORLD, extraCopy)) {
 			char* worldKey = strtok(output, g_parseExtraTokens);
-			LoadWorld(worldKey, (LegoWorld*) m_entity);
+			if (LoadWorld(worldKey, (LegoWorld*) m_entity) != SUCCESS) {
+				Lego()->SetFatalError(LegoOmni::FatalError::e_loadWorld);
+			}
 			((LegoWorld*) m_entity)->SetWorldId(Lego()->GetWorldId(worldKey));
 		}
 	}
