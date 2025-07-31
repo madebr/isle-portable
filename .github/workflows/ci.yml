@@ -111,6 +111,7 @@ jobs:
           ${{ matrix.cmake-wrapper || '' }} cmake -S . -B build -G "${{ matrix.generator }}" \
             ${{ matrix.cmake-args || '' }} \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_UNITY_BUILD=ON \
             -DISLE_USE_DX5=${{ !!matrix.dx5 }} \
             -DISLE_BUILD_CONFIG=${{ !!matrix.config }} \
             -DENABLE_CLANG_TIDY=${{ !!matrix.clang-tidy  }} \
