@@ -1,5 +1,11 @@
 #include "extensions/textureloader.h"
 
+#include "misc.h"
+#include "legovideomanager.h"
+#include "mxdirectx/mxdirect3d.h"
+#include "mxmain.h"
+#include "tgl/d3drm/impl.h"
+
 using namespace Extensions;
 
 std::map<std::string, std::string> TextureLoader::options;
