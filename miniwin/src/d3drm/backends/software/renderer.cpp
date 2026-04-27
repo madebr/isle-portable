@@ -5,7 +5,12 @@
 #include "meshutils.h"
 #include "miniwin.h"
 
+#define SDL_DISABLE_AVX
+#define SDL_DISABLE_AVX2
+#define SDL_DISABLE_AVX512F
+
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_intrin.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -58,26 +63,52 @@ void Direct3DRMSoftwareRenderer::SetProjection(const D3DRMMATRIX4D& projection, 
 	memcpy(m_projection, projection, sizeof(D3DRMMATRIX4D));
 }
 
+static const float INF = std::numeric_limits<float>::infinity();
+
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+static void clear_zbuffer_sse2(float* buffer, size_t size) SDL_TARGETING("sse2");
+static void clear_zbuffer_sse2(float* buffer, size_t size)
+{
+	size_t i = 0;
+
+	__m128 inf4 = _mm_set1_ps(INF);
+	for (; i + 4 <= size; i += 4) {
+		_mm_storeu_ps(&buffer[i], inf4);
+	}
+	for (; i < size; ++i) {
+		buffer[i] = INF;
+	}
+}
+#endif
+
+#if defined(__i386__) || defined(_M_IX86)
+static void clear_zbuffer_mmx(float* buffer, size_t size) SDL_TARGETING("mmx");
+static void clear_zbuffer_mmx(float* buffer, size_t size)
+{
+	size_t i = 0;
+	static const __m64 MM_INF = _mm_set_pi32(0x7F800000, 0x7F800000);
+	for (; i + 2 <= size; i += 2) {
+		*reinterpret_cast<__m64*>(buffer) = MM_INF;
+	}
+	_mm_empty();
+	for (; i < size; ++i) {
+		buffer[i] = INF;
+	}
+}
+#endif
+
 void Direct3DRMSoftwareRenderer::ClearZBuffer()
 {
 	const size_t size = m_zBuffer.size();
-	const float inf = std::numeric_limits<float>::infinity();
 	size_t i = 0;
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 	if (SDL_HasSSE2()) {
-		__m128 inf4 = _mm_set1_ps(inf);
-		for (; i + 4 <= size; i += 4) {
-			_mm_storeu_ps(&m_zBuffer[i], inf4);
-		}
+		clear_zbuffer_sse2(m_zBuffer.data(), size);
 	}
 #if defined(__i386__) || defined(_M_IX86)
 	else if (SDL_HasMMX()) {
-		const __m64 mm_inf = _mm_set_pi32(0x7F800000, 0x7F800000);
-		for (; i + 2 <= size; i += 2) {
-			*reinterpret_cast<__m64*>(&m_zBuffer[i]) = mm_inf;
-		}
-		_mm_empty();
+		clear_zbuffer_mmx(m_zBuffer.data(), size);
 	}
 #endif
 #elif (defined(__arm__) || defined(__aarch64__)) && !defined(__3DS__)
@@ -87,17 +118,19 @@ void Direct3DRMSoftwareRenderer::ClearZBuffer()
 			vst1q_f32(&m_zBuffer[i], inf4);
 		}
 	}
+	for (; i < size; ++i) {
+		m_zBuffer[i] = INF;
+	}
 #elif defined(__wasm_simd128__)
 	const size_t simdWidth = 4;
 	v128_t infVec = wasm_f32x4_splat(inf);
 	for (; i + simdWidth <= size; i += simdWidth) {
 		wasm_v128_store(&m_zBuffer[i], infVec);
 	}
-#endif
-
 	for (; i < size; ++i) {
-		m_zBuffer[i] = inf;
+		m_zBuffer[i] = INF;
 	}
+#endif
 }
 
 void Direct3DRMSoftwareRenderer::ProjectVertex(const D3DVECTOR& v, D3DRMVECTOR4D& p) const
